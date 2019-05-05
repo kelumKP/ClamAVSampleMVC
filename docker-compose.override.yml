@@ -4,10 +4,27 @@ services:
   clamav-server:
     ports:
       - "3310"
+  minio:
+    environment:
+      - MINIO_ACCESS_KEY=admin
+      - MINIO_SECRET_KEY=password
+    ports:
+      - "9000:9000"
+  mssql:
+    environment:
+      - SA_PASSWORD=Pass@word
+      - ACCEPT_EULA=Y
+    ports:
+      - "1433:1433" 
   virusscanner.mvc:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ClamAVServerHost=clamav-server
       - ClamAVServerPort=3310
+      - MinioHost=minio
+      - MinioPort=9000
+      - MinioAccessKey=admin
+      - MinioSecretKey=password
+      - ConnectionString=Server=mssql;Initial Catalog=VirusScanner.Uploads;User Id=sa;Password=Pass@word
     ports:
       - "80"

@@ -1,29 +1,38 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Minio;
+using Minio.Exceptions;
 using nClam;
+using VirusScanner.MVC.Domain.Entities;
 using VirusScanner.MVC.Models;
+using VirusScanner.MVC.Persistence;
 
 namespace VirusScanner.MVC.Controllers
 {
     public class HomeController : Controller
     {
+        private readonly UploadsDbContext _context;
+        private readonly MinioClient _minio;
         private readonly ClamClient _clam;
         private readonly ILogger _logger;
-        private readonly IHostingEnvironment _hostingEnvironment;
 
-        public HomeController(ClamClient clam, ILogger<HomeController> logger, IHostingEnvironment hostingEnvironment)
+        private const string BUCKET_NAME = "virus-scanned-files";
+
+        public HomeController(UploadsDbContext context, 
+                                MinioClient minio, 
+                                ClamClient clam, 
+                                ILogger<HomeController> logger)
         {
+            _context = context;
+            _minio = minio;
             _clam = clam;
             _logger = logger;
-            _hostingEnvironment = hostingEnvironment;
         }
 
         public IActionResult Index()
@@ -57,24 +66,68 @@ namespace VirusScanner.MVC.Controllers
             {
                 if (formFile.Length > 0)
                 {
+                    var extension = formFile.FileName.Contains('.')
+                        ? formFile.FileName.Substring(formFile.FileName.LastIndexOf('.'), formFile.FileName.Length - formFile.FileName.LastIndexOf('.'))
+                        : string.Empty;
+                    var file = new File
+                    {
+                        Name = $"{Guid.NewGuid()}{extension}",
+                        Alias = formFile.FileName,
+                        Region = "us-east-1",
+                        Bucket = BUCKET_NAME,
+                        ContentType = formFile.ContentType,
+                        Size = formFile.Length,
+                        Uploaded = DateTime.UtcNow,
+                    };
                     var ping = await _clam.PingAsync();
 
                     if (ping)
                     {
                         _logger.LogInformation("Successfully pinged the ClamAV server.");
                         var result = await _clam.SendAndScanFileAsync(formFile.OpenReadStream());
-                        if (result.Result != ClamScanResults.Clean)
+
+                        file.ScanResult = result.Result.ToString();
+                        file.Infected = result.Result == ClamScanResults.VirusDetected;
+                        file.Scanned = DateTime.UtcNow;
+                        if (result.InfectedFiles != null)
                         {
-                            _logger.LogWarning($"{formFile.FileName} was found to have viruses: ${result.RawResult}.");
-                        }
-                        else
-                        {
-                            var filePath = Path.Combine(_hostingEnvironment.ContentRootPath, "data", formFile.FileName);
-                            using (var stream = new FileStream(filePath, FileMode.Create))
+                            foreach (var infectedFile in result.InfectedFiles)
                             {
-                                await formFile.CopyToAsync(stream);
+                                file.Viruses.Add(new Virus
+                                {
+                                    Name = infectedFile.VirusName
+                                });
                             }
                         }
+                        var metaData = new Dictionary<string, string>
+                        {
+                            { "av-status", result.Result.ToString() },
+                            { "av-timestamp", DateTime.UtcNow.ToString() },
+                            { "alias", file.Alias }
+                        };
+
+                        try
+                        {
+                            var found = await _minio.BucketExistsAsync(BUCKET_NAME);
+                            if (!found)
+                            {
+                                await _minio.MakeBucketAsync(BUCKET_NAME);
+                            }
+                            await _minio.PutObjectAsync(BUCKET_NAME,
+                                                        file.Name,
+                                                        formFile.OpenReadStream(),
+                                                        formFile.Length,
+                                                        formFile.ContentType,
+                                                        metaData);
+                            await _context.Files.AddAsync(file);
+                            await _context.SaveChangesAsync();
+                        }
+                        catch (MinioException e)
+                        {
+                            _logger.LogError($"File Upload Error: {e.Message}");
+                        }
+
+
                         var scanResult = new ScanResult()
                         {
                             FileName = formFile.FileName,

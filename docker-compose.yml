@@ -3,6 +3,13 @@ version: '3.4'
 services:
   clamav-server:
     image: mkodockx/docker-clamav
+  minio:
+    image: minio/minio
+    volumes:
+      - data:/data
+    command: server /data
+  mssql:
+    image: microsoft/mssql-server-linux
   virusscanner.mvc:
     image: ${DOCKER_REGISTRY-}virusscanner
     build:
@@ -10,3 +17,7 @@ services:
       dockerfile: VirusScanner.MVC/Dockerfile
     depends_on:
       - clamav-server
+      - minio
+      - mssql
+volumes:
+  data:
