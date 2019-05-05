@@ -1,0 +1,12 @@
+version: '3.4'
+
+services:
+  clamav-server:
+    image: mkodockx/docker-clamav
+  virusscanner.mvc:
+    image: ${DOCKER_REGISTRY-}virusscanner
+    build:
+      context: .
+      dockerfile: VirusScanner.MVC/Dockerfile
+    depends_on:
+      - clamav-server

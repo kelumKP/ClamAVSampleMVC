@@ -1,0 +1,11 @@
+version: '3.4'
+
+services:
+  clamav-server:
+    ports:
+      - "3310"
+  virusscanner.mvc:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+    ports:
+      - "80"
