@@ -34,7 +34,18 @@ namespace VirusScanner.MVC
 
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
-            services.AddTransient<ClamClient>(x => new ClamClient("clamav-server", 3310));
+            services.AddTransient<ClamClient>(x =>
+            {
+                var host = Configuration["ClamAVServerHost"];
+                if (int.TryParse(Configuration["ClamAVServerPort"], out var port))
+                {
+                    return new ClamClient(host, port);
+                }
+                else
+                {
+                    return new ClamClient(host, port);
+                }
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
