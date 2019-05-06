@@ -10,6 +10,9 @@ namespace VirusScanner.MVC.Persistence.Configurations
         {
             builder.HasKey(f => f.Id);
 
+            builder.HasIndex(f => f.Name)
+                .IsUnique();
+
             builder.Property(f => f.Id)
                 .IsRequired()
                 .ValueGeneratedOnAdd();

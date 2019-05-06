@@ -10,7 +10,7 @@ using VirusScanner.MVC.Persistence;
 namespace VirusScanner.MVC.Persistence.Migrations
 {
     [DbContext(typeof(UploadsDbContext))]
-    [Migration("20190505201636_InitialCreate")]
+    [Migration("20190506024104_InitialCreate")]
     partial class InitialCreate
     {
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -61,6 +61,9 @@ namespace VirusScanner.MVC.Persistence.Migrations
                         .HasColumnType("datetime");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
 
                     b.ToTable("Files");
                 });

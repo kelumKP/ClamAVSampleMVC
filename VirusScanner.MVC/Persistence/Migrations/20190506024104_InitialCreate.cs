@@ -51,6 +51,12 @@ namespace VirusScanner.MVC.Persistence.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_Files_Name",
+                table: "Files",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Viruses_FileId",
                 table: "Viruses",
                 column: "FileId");
